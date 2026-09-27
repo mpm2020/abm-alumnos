@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABM de Alumnos</title>
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --danger: #dc2626;
+    --bg: #f4f5f9;
+    --card: #ffffff;
+    --text: #1f2333;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+  p.subtitle { color: var(--muted); margin-top: 0; margin-bottom: 1.5rem; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  .card h2 { margin-top: 0; font-size: 1.1rem; }
+
+  form { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  form .full { grid-column: 1 / -1; }
+  label { font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 0.25rem; }
+  input {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+  }
+  input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+  .actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; margin-top: 0.25rem; }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  button.primary { background: var(--primary); color: white; }
+  button.primary:hover { background: var(--primary-dark); }
+  button.secondary { background: #eef0f7; color: var(--text); }
+  button.secondary:hover { background: #e2e4f0; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+  td .curso-tag {
+    background: #eef0f7; color: var(--primary-dark);
+    padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.8rem;
+  }
+  .row-actions button { font-size: 0.8rem; padding: 0.35rem 0.6rem; margin-right: 0.3rem; }
+  .btn-edit { background: #fef3c7; color: #92400e; }
+  .btn-delete { background: #fee2e2; color: var(--danger); }
+
+  #mensaje {
+    padding: 0.6rem 0.8rem; border-radius: 8px; margin-bottom: 1rem;
+    font-size: 0.9rem; display: none;
+  }
+  #mensaje.ok { background: #dcfce7; color: #166534; display: block; }
+  #mensaje.error { background: #fee2e2; color: #991b1b; display: block; }
+
+  .empty { text-align: center; color: var(--muted); padding: 1.5rem 0; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎓 ABM de Alumnos</h1>
+  <p class="subtitle">Proyecto educativo: API REST + SQLite + HTML/JS vanilla</p>
+
+  <div id="mensaje"></div>
+
+  <div class="card">
+    <h2 id="form-title">➕ Nuevo alumno</h2>
+    <form id="form-alumno">
+      <input type="hidden" id="alumno-id">
+      <div>
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" required placeholder="Ej: Ana Pérez">
+      </div>
+      <div>
+        <label for="email">Email</label>
+        <input type="email" id="email" required placeholder="ana@correo.com">
+      </div>
+      <div class="full">
+        <label for="curso">Curso</label>
+        <input type="text" id="curso" required placeholder="Ej: Programación III">
+      </div>
+      <div class="actions">
+        <button type="submit" class="primary" id="btn-submit">Guardar</button>
+        <button type="button" class="secondary" id="btn-cancelar" style="display:none;">Cancelar edición</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>📋 Listado de alumnos</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Nombre</th><th>Email</th><th>Curso</th><th>Acciones</th></tr>
+      </thead>
+      <tbody id="tabla-body"></tbody>
+    </table>
+    <div id="empty-state" class="empty" style="display:none;">Todavía no hay alumnos cargados.</div>
+  </div>
+</div>
+
+<script>
+  // Si el frontend se sirve desde el mismo backend, usar ruta relativa.
+  // Si lo publicás por separado, reemplazá por la URL completa de tu API.
+  const API_URL = '/api/alumnos';
+
+  const form = document.getElementById('form-alumno');
+  const tablaBody = document.getElementById('tabla-body');
+  const emptyState = document.getElementById('empty-state');
+  const mensaje = document.getElementById('mensaje');
+  const btnCancelar = document.getElementById('btn-cancelar');
+  const formTitle = document.getElementById('form-title');
+  const btnSubmit = document.getElementById('btn-submit');
+
+  function mostrarMensaje(texto, tipo) {
+    mensaje.textContent = texto;
+    mensaje.className = tipo;
+    setTimeout(() => { mensaje.className = ''; }, 3000);
+  }
+
+  async function cargarAlumnos() {
+    try {
+      const res = await fetch(API_URL);
+      const alumnos = await res.json();
+      renderTabla(alumnos);
+    } catch (err) {
+      mostrarMensaje('No se pudo conectar con la API', 'error');
+    }
+  }
+
+  function renderTabla(alumnos) {
+    tablaBody.innerHTML = '';
+    emptyState.style.display = alumnos.length === 0 ? 'block' : 'none';
+
+    alumnos.forEach(a => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${a.id}</td>
+        <td>${a.nombre}</td>
+        <td>${a.email}</td>
+        <td><span class="curso-tag">${a.curso}</span></td>
+        <td class="row-actions">
+          <button class="btn-edit" onclick="editarAlumno(${a.id})">Editar</button>
+          <button class="btn-delete" onclick="borrarAlumno(${a.id})">Borrar</button>
+        </td>
+      `;
+      tablaBody.appendChild(tr);
+    });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('alumno-id').value;
+    const payload = {
+      nombre: document.getElementById('nombre').value,
+      email: document.getElementById('email').value,
+      curso: document.getElementById('curso').value,
+    };
+
+    const esEdicion = !!id;
+    const url = esEdicion ? `${API_URL}/${id}` : API_URL;
+    const metodo = esEdicion ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        const err = data.errores ? data.errores.join(', ') : data.error;
+        mostrarMensaje(err || 'Error al guardar', 'error');
+        return;
+      }
+
+      mostrarMensaje(esEdicion ? 'Alumno actualizado ✔' : 'Alumno creado ✔', 'ok');
+      resetForm();
+      cargarAlumnos();
+    } catch (err) {
+      mostrarMensaje('No se pudo conectar con la API', 'error');
+    }
+  });
+
+  async function editarAlumno(id) {
+    const res = await fetch(`${API_URL}/${id}`);
+    const a = await res.json();
+    document.getElementById('alumno-id').value = a.id;
+    document.getElementById('nombre').value = a.nombre;
+    document.getElementById('email').value = a.email;
+    document.getElementById('curso').value = a.curso;
+    formTitle.textContent = '✏️ Editando alumno #' + a.id;
+    btnSubmit.textContent = 'Actualizar';
+    btnCancelar.style.display = 'inline-block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function borrarAlumno(id) {
+    if (!confirm('¿Seguro que querés borrar este alumno?')) return;
+    try {
+      const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+      if (res.status === 204) {
+        mostrarMensaje('Alumno borrado ✔', 'ok');
+        cargarAlumnos();
+      } else {
+        mostrarMensaje('Error al borrar', 'error');
+      }
+    } catch (err) {
+      mostrarMensaje('No se pudo conectar con la API', 'error');
+    }
+  }
+
+  btnCancelar.addEventListener('click', resetForm);
+
+  function resetForm() {
+    form.reset();
+    document.getElementById('alumno-id').value = '';
+    formTitle.textContent = '➕ Nuevo alumno';
+    btnSubmit.textContent = 'Guardar';
+    btnCancelar.style.display = 'none';
+  }
+
+  cargarAlumnos();
+</script>
+</body>
+</html>
