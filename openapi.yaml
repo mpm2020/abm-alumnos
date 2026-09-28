@@ -1,0 +1,200 @@
+openapi: 3.0.3
+info:
+  title: API ABM de Alumnos
+  description: API REST educativa para gestionar alumnos (Alta, Baja, Modificación, Listado)
+  version: 1.0.0
+servers:
+  - url: https://abm-alumnos.onrender.com
+    description: Servidor en producción (Render)
+  - url: http://localhost:3000
+    description: Servidor local
+
+tags:
+  - name: Alumnos
+    description: Operaciones del ABM de alumnos
+
+paths:
+  /api/alumnos:
+    get:
+      tags: [Alumnos]
+      summary: Listar todos los alumnos
+      responses:
+        '200':
+          description: Lista de alumnos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alumno'
+    post:
+      tags: [Alumnos]
+      summary: Crear un nuevo alumno (Alta)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlumnoInput'
+            example:
+              nombre: Ana Pérez
+              email: ana@correo.com
+              curso: Programación III
+      responses:
+        '201':
+          description: Alumno creado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alumno'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidacion'
+        '409':
+          description: Ya existe un alumno con ese email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/alumnos/{id}:
+    get:
+      tags: [Alumnos]
+      summary: Obtener un alumno por ID
+      parameters:
+        - $ref: '#/components/parameters/AlumnoId'
+      responses:
+        '200':
+          description: Alumno encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alumno'
+        '404':
+          description: Alumno no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Alumnos]
+      summary: Modificar un alumno existente
+      parameters:
+        - $ref: '#/components/parameters/AlumnoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlumnoInput'
+            example:
+              nombre: Ana G. Pérez
+              email: ana@correo.com
+              curso: Programación IV
+      responses:
+        '200':
+          description: Alumno actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alumno'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidacion'
+        '404':
+          description: Alumno no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Ya existe un alumno con ese email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Alumnos]
+      summary: Borrar un alumno (Baja)
+      parameters:
+        - $ref: '#/components/parameters/AlumnoId'
+      responses:
+        '204':
+          description: Alumno borrado correctamente (sin contenido)
+        '404':
+          description: Alumno no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  parameters:
+    AlumnoId:
+      name: id
+      in: path
+      required: true
+      description: ID del alumno
+      schema:
+        type: integer
+        example: 1
+
+  schemas:
+    Alumno:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: Ana Pérez
+        email:
+          type: string
+          format: email
+          example: ana@correo.com
+        curso:
+          type: string
+          example: Programación III
+        creado_en:
+          type: string
+          example: "2026-09-27 15:16:49"
+
+    AlumnoInput:
+      type: object
+      required: [nombre, email, curso]
+      properties:
+        nombre:
+          type: string
+          example: Ana Pérez
+        email:
+          type: string
+          format: email
+          example: ana@correo.com
+        curso:
+          type: string
+          example: Programación III
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Alumno no encontrado
+
+    ErrorValidacion:
+      type: object
+      properties:
+        errores:
+          type: array
+          items:
+            type: string
+          example:
+            - "El nombre es obligatorio (mínimo 2 caracteres)"
+            - "El email no es válido"
